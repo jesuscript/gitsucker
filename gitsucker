@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import sys, csv, threading, getopt
 
 from github import github
@@ -19,7 +21,7 @@ class ForkerThread ( threading.Thread ):
 
 
 def usage_help():
-    print "Usage: python gitsucker.py [options] <project_name>"
+    print "Usage: ./gitsucker [options] <project_name>"
     print "Options:"
     print "\t-f\t CSV filename (default: users.csv)"
     print "\t-n\t Maximum nuber of concurrent API requests (default: 3)"

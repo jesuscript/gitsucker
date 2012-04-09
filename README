@@ -14,6 +14,10 @@ The output produced is a CSV file - feel free to import this into Excell and sor
 
 Installation:
 
+make sure you have Python:
+
+/usr/bin/python --version
+
 The script uses the py-github module for hanling API. You can install that by cloning it's repository:
 
 git clone https://github.com/dustin/py-github.git github
@@ -27,7 +31,7 @@ sudo python setup.py install
 
 Usage example:
 
-python gitsucker.py -n 5 py-github
+./gitsucker -n 5 py-github
 
 This will attempt to get the data for all users who forked py-github and will run up to 5 concurrent API requests at any time.
 
