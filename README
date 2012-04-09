@@ -36,4 +36,10 @@ This will attempt to get the data for all users who forked py-github and will ru
 Known issues:
 
 * Sometimes the API returns 403 Forbidden on certain requests. I'm not entirelly sure as for why this happens, but I've noticed that this isn't deterministic either: the same request may respond with data and sometimes - with an error. It would require more time to investigate this fully. However, this only tends to happen with larger projects (e.g. backbone). Failed request for a user is handled nicely: the script just ignores that user (acknowledging the failure). If the repo search or the repo network request fails - well, there isn't much you can do about it. Just run the program again...
+* This script relies on the repository search function in order to find a project of interest without knowing it's author's username (as in the task description). Currently this function is ony supported in API v2 and generally, I believe, isn't overly efficient. Furthermore, Github API v2 is going to be switched off soon in favour of API v3. In order to perform the same task using API v3 the user of gitsucker would have to supply the name of the repo author as well as the project name. I don't see a problem with this: you can find the name of any (public) repository author on the github website. My recommendation would be to revise the task description and replace the following line:
 
+"1. Type in gitsucker <project_name> (eg. gitsucker backbone)"
+
+with
+
+"1. Type in gitsucker <username> <project_name> (eg. gitsucker documentcloud backbone)"
