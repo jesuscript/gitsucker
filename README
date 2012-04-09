@@ -1,0 +1,39 @@
+Gitsucker
+
+This is a script to find and rank all people who forked a particular project on GitHub according to the following criteria:
+
+* number of original projects they've authored
+* number of ruby or javascript projects they have authored or forked
+* number of orignal or forked projects they have
+
+API requests to github may, depending on your network bandwidth and latency, take quite a bit of time to complete, so this script attempts to run the requests concurrently. The number of concurrent requests is limited (option -n). You can set the limit to whatever, but generally I would not recommend running more than 10 threads at the same time in order to avoid potential I/O issues.
+
+The output produced is a CSV file - feel free to import this into Excell and sort in any direction you like :)
+
+
+
+Installation:
+
+The script uses the py-github module for hanling API. You can install that by cloning it's repository:
+
+git clone https://github.com/dustin/py-github.git github
+
+... and installing it on your system:
+
+cd github
+sudo python setup.py install
+
+
+
+Usage example:
+
+python gitsucker.py -n 5 py-github
+
+This will attempt to get the data for all users who forked py-github and will run up to 5 concurrent API requests at any time.
+
+
+
+Known issues:
+
+* Sometimes the API returns 403 Forbidden on certain requests. I'm not entirelly sure as for why this happens, but I've noticed that this isn't deterministic either: the same request may respond with data and sometimes - with an error. It would require more time to investigate this fully. However, this only tends to happen with larger projects (e.g. backbone). Failed request for a user is handled nicely: the script just ignores that user (acknowledging the failure). If the repo search or the repo network request fails - well, there isn't much you can do about it. Just run the program again...
+

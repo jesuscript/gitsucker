@@ -1,0 +1,196 @@
+import sys, csv, threading, getopt
+
+from github import github
+from urllib2 import HTTPError
+from Queue import Queue
+
+class ForkerThread ( threading.Thread ):
+    def __init__(self,handler,username):
+        self.handler = handler
+        self.username = username
+        threading.Thread.__init__(self)
+
+    def get_result(self):
+        return self.result
+
+    def run (self):
+        self.result = get_forker_data(self.handler, self.username)
+
+
+
+def usage_help():
+    print "Usage: python gitsucker.py [options] <project_name>"
+    print "Options:"
+    print "\t-f\t CSV filename (default: users.csv)"
+    print "\t-n\t Maximum nuber of concurrent API requests (default: 3)"
+
+"""
+Find the project of interest. The name must be an exact match
+"""
+def get_project(handler,project_name):
+    print("Searching for project: %s" % project_name)
+
+    # Find the repository of interest
+    repos = handler.repos.search(project_name)
+
+    project = None
+
+    for repo in repos:
+        # search may return a long list of results, but we
+        # only need the exact match
+        if repo.name == project_name:
+            project = repo
+
+    return project
+
+"""
+Get the command line arguments and put them in a map (dictionary)
+"""
+def get_args():
+    try: 
+        opts, args = getopt.getopt(sys.argv[1:],'f:n:',['help'])
+    except getopt.GetoptError, err:
+        print str(err) 
+        usage_help()
+        sys.exit()
+
+    if len(args) < 1:
+        usage_help()
+        sys.exit()
+
+    arg_map = {}
+    arg_map["project_name"] = args[0]
+    arg_map["filename"] = "users.csv"
+    arg_map["queuesize"] = 3
+    
+    for o,a in opts:
+        if o == "-f":
+            arg_map["filename"] = a
+        elif o == "-n":
+            arg_map["queuesize"] = a
+
+    return arg_map
+
+
+"""
+Get the information for one forker of the project:
+- Username
+- The number of authored projects
+- The number of authored/forked projects written in Ruby or JS
+- The total number of authored/forked projects
+
+Sometimes Github API returns a 403 - this exception is handeled in 
+order to prevent the program from crashing.
+"""
+def get_forker_data(handler,username):
+    projects_fetched = 0
+    page = 1
+    user = {}
+
+    try:
+        user["name"] = username
+        user["authored"] = 0
+        user["ruby or js"] = 0
+        user["total"] = handler.users.show(username).public_repo_count
+
+        while projects_fetched < user["total"]:
+            user_projects = handler.repos.forUser(username, page=page)
+            for project in user_projects:
+                if not project.fork:
+                    user["authored"] += 1
+                if(hasattr(project,"language") and 
+                   (project.language == "Ruby" or 
+                    project.language == "Javascript")):
+                
+                    user["ruby or js"] += 1
+
+                projects_fetched += len(user_projects)
+                page +=1
+
+    except HTTPError, err:
+        print("Failed to get data for %s: %s" % (username, err.code))
+        return None
+
+    return user
+
+"""
+Gett all forkers' data. This function manages Forker Threads
+"""
+def get_all_forkers(handler,project_username,project_name,q_size):
+    def producer(q, forks):
+        # Spawn threads:
+        for fork in forks:
+            thread = ForkerThread(handler,fork.owner)
+            thread.start()
+            # blocks if the queue is full
+            q.put(thread, True)
+
+    users = []
+
+    def consumer(q, total_forks):
+        # get results and join the forker back into main
+        while len(users) < total_forks:
+            thread = q.get(True)
+            thread.join()
+            user = thread.get_result()
+
+            if user == None:
+                total_forks -= 1
+            else:
+                users.append(user)
+                print "Fetched " + user["name"]
+
+    # set the queue size here
+    q = Queue(q_size)
+
+    forks = handler.repos.network(project_username, project_name)
+
+    prod_thread = threading.Thread(target=producer, args=(q, forks))
+    cons_thread = threading.Thread(target=consumer, args=(q, len(forks)))
+    prod_thread.start()
+    cons_thread.start()
+    prod_thread.join()
+    cons_thread.join()
+
+    return users
+
+def print_users(users):
+    for user in users:
+        print("%s: %s, %s, %s" % (user["name"], 
+                                  user["authored"],
+                                  user["ruby or js"],
+                                  user["total"]))
+
+def print_users_to_csv(users, filename):
+    csv_writer = csv.writer(open(filename,'wb'), delimiter = ',',
+                            quoting=csv.QUOTE_MINIMAL)
+
+    csv_writer.writerow(['username','authored projects','ruby or js projects',
+                         'total projects'])
+    for user in users:
+        csv_writer.writerow([user["name"],user["authored"], user["ruby or js"],
+                             user["total"]])
+
+
+
+def main():
+    args = get_args()
+    gh = github.GitHub()
+    project = get_project(gh,args["project_name"])
+    q_size = args["queuesize"]
+
+    if project:
+        print "Found the project."
+    else:
+        print "Project not found."
+        sys.exit()
+
+    users = get_all_forkers(gh,project.username,project.name,q_size)
+
+    #print_users(users)
+    print_users_to_csv(users,args["filename"])
+
+
+if __name__ == "__main__":
+    main()           
+
